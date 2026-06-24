@@ -50,7 +50,7 @@ export default function ArticleAnalyzer() {
         throw new Error(data.error ?? "Не удалось выполнить запрос");
       }
 
-      setResult(data.result);
+      setResult(JSON.stringify(data, null, 2));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
       setActiveAction(null);
@@ -135,10 +135,12 @@ export default function ArticleAnalyzer() {
                 className="size-5 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600"
                 aria-hidden="true"
               />
-              <span>Генерация ответа…</span>
+              <span>Парсинг статьи…</span>
             </div>
           ) : result ? (
-            <p className="whitespace-pre-wrap leading-relaxed">{result}</p>
+            <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-sm leading-relaxed">
+              {result}
+            </pre>
           ) : (
             <p className="text-zinc-500">
               Здесь появится результат после выбора действия

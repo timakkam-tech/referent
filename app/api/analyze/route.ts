@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchAndParseArticle } from "@/lib/parse-article";
 
 type Action = "summary" | "thesis" | "telegram";
 
-const PLACEHOLDERS: Record<Action, string> = {
-  summary:
-    "Краткое содержание статьи появится здесь после подключения AI и парсинга страницы.",
-  thesis:
-    "Список тезисов появится здесь после подключения AI и парсинга страницы.",
-  telegram:
-    "Текст поста для Telegram появится здесь после подключения AI и парсинга страницы.",
-};
+const VALID_ACTIONS: Action[] = ["summary", "thesis", "telegram"];
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -26,11 +20,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Некорректный URL" }, { status: 400 });
   }
 
-  if (!PLACEHOLDERS[action]) {
+  if (!VALID_ACTIONS.includes(action)) {
     return NextResponse.json({ error: "Неизвестное действие" }, { status: 400 });
   }
 
-  return NextResponse.json({
-    result: `${PLACEHOLDERS[action]}\n\nСтатья: ${url}`,
-  });
+  try {
+    const article = await fetchAndParseArticle(url);
+
+    if (!article.title && !article.content) {
+      return NextResponse.json(
+        { error: "Не удалось извлечь содержимое статьи" },
+        { status: 422 },
+      );
+    }
+
+    return NextResponse.json(article);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Ошибка при парсинге статьи";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
