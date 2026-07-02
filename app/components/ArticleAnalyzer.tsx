@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 
-type Action = "summary" | "thesis" | "telegram";
+type Action = "summary" | "thesis" | "telegram" | "translate";
 
 const ACTIONS: { id: Action; label: string }[] = [
   { id: "summary", label: "О чем статья?" },
   { id: "thesis", label: "Тезисы" },
   { id: "telegram", label: "Пост для Telegram" },
+  { id: "translate", label: "Перевод" },
 ];
 
 export default function ArticleAnalyzer() {
@@ -50,7 +51,11 @@ export default function ArticleAnalyzer() {
         throw new Error(data.error ?? "Не удалось выполнить запрос");
       }
 
-      setResult(JSON.stringify(data, null, 2));
+      if (action === "translate" && typeof data.result === "string") {
+        setResult(data.result);
+      } else {
+        setResult(JSON.stringify(data, null, 2));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
       setActiveAction(null);
@@ -61,6 +66,9 @@ export default function ArticleAnalyzer() {
 
   const activeLabel =
     ACTIONS.find((item) => item.id === activeAction)?.label ?? null;
+
+  const loadingText =
+    activeAction === "translate" ? "Перевод статьи…" : "Парсинг статьи…";
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6 sm:py-16">
@@ -95,14 +103,14 @@ export default function ArticleAnalyzer() {
           />
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {ACTIONS.map((action) => (
             <button
               key={action.id}
               type="button"
               onClick={() => handleAction(action.id)}
               disabled={loading}
-              className="rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-1"
+              className="rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {action.label}
             </button>
@@ -135,10 +143,10 @@ export default function ArticleAnalyzer() {
                 className="size-5 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600"
                 aria-hidden="true"
               />
-              <span>Парсинг статьи…</span>
+              <span>{loadingText}</span>
             </div>
           ) : result ? (
-            <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-sm leading-relaxed">
+            <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-relaxed">
               {result}
             </pre>
           ) : (

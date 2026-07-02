@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { translateArticle } from "@/lib/openrouter";
 import { fetchAndParseArticle } from "@/lib/parse-article";
 
-type Action = "summary" | "thesis" | "telegram";
+type Action = "summary" | "thesis" | "telegram" | "translate";
 
-const VALID_ACTIONS: Action[] = ["summary", "thesis", "telegram"];
+const VALID_ACTIONS: Action[] = ["summary", "thesis", "telegram", "translate"];
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -34,10 +35,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (action === "translate") {
+      if (!article.content) {
+        return NextResponse.json(
+          { error: "Не удалось извлечь текст статьи для перевода" },
+          { status: 422 },
+        );
+      }
+
+      const result = await translateArticle(article.title, article.content);
+      return NextResponse.json({ result });
+    }
+
     return NextResponse.json(article);
   } catch (err) {
     const message =
-      err instanceof Error ? err.message : "Ошибка при парсинге статьи";
+      err instanceof Error ? err.message : "Ошибка при обработке статьи";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
