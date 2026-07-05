@@ -11,6 +11,13 @@ const ACTIONS: { id: Action; label: string }[] = [
   { id: "translate", label: "Перевод" },
 ];
 
+const LOADING_TEXTS: Record<Action, string> = {
+  summary: "Анализ статьи…",
+  thesis: "Формирование тезисов…",
+  telegram: "Генерация поста…",
+  translate: "Перевод статьи…",
+};
+
 export default function ArticleAnalyzer() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState("");
@@ -51,11 +58,11 @@ export default function ArticleAnalyzer() {
         throw new Error(data.error ?? "Не удалось выполнить запрос");
       }
 
-      if (action === "translate" && typeof data.result === "string") {
-        setResult(data.result);
-      } else {
-        setResult(JSON.stringify(data, null, 2));
+      if (typeof data.result !== "string") {
+        throw new Error("Сервер вернул некорректный ответ");
       }
+
+      setResult(data.result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
       setActiveAction(null);
@@ -67,8 +74,9 @@ export default function ArticleAnalyzer() {
   const activeLabel =
     ACTIONS.find((item) => item.id === activeAction)?.label ?? null;
 
-  const loadingText =
-    activeAction === "translate" ? "Перевод статьи…" : "Парсинг статьи…";
+  const loadingText = activeAction
+    ? LOADING_TEXTS[activeAction]
+    : "Обработка…";
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6 sm:py-16">
@@ -146,9 +154,9 @@ export default function ArticleAnalyzer() {
               <span>{loadingText}</span>
             </div>
           ) : result ? (
-            <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-relaxed">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">
               {result}
-            </pre>
+            </p>
           ) : (
             <p className="text-zinc-500">
               Здесь появится результат после выбора действия

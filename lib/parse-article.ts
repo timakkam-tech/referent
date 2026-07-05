@@ -94,7 +94,15 @@ function extractContent($: cheerio.CheerioAPI): string | null {
     const clone = element.clone();
     clone.find("script, style, nav, footer, aside, .comments, .sidebar").remove();
 
-    const text = cleanText(clone.text());
+    const blocks: string[] = [];
+    clone.find("p, h2, h3, h4, li, blockquote").each((_, el) => {
+      const text = cleanText($(el).text());
+      if (text.length > 20) blocks.push(text);
+    });
+
+    const text =
+      blocks.length > 0 ? blocks.join("\n\n") : cleanText(clone.text());
+
     if (text.length > 100) return text;
   }
 
