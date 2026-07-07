@@ -203,21 +203,21 @@ export default function ArticleAnalyzer() {
   const statusText = activeAction ? STATUS_TEXTS[activeAction] : null;
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6 sm:py-16">
-      <header className="mb-10">
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">
+    <div className="mx-auto w-full min-w-0 max-w-2xl overflow-x-hidden px-4 py-8 sm:px-6 sm:py-12 md:py-16">
+      <header className="mb-8 md:mb-10">
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl">
           Referent
         </h1>
-        <p className="mt-2 text-zinc-600">
+        <p className="mt-2 break-words text-sm text-zinc-600 sm:text-base">
           Вставьте ссылку на англоязычную статью и выберите действие
         </p>
       </header>
 
       <form
         onSubmit={(e) => e.preventDefault()}
-        className="space-y-6"
+        className="space-y-5 sm:space-y-6"
       >
-        <div>
+        <div className="min-w-0">
           <label
             htmlFor="article-url"
             className="mb-2 block text-sm font-medium text-zinc-700"
@@ -229,16 +229,16 @@ export default function ArticleAnalyzer() {
             type="url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="Введите URL статьи, например: https://example.com/article"
-            className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-3 text-zinc-900 placeholder:text-zinc-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+            placeholder="https://example.com/article"
+            className="w-full min-w-0 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-400 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 sm:text-sm"
             disabled={loading}
           />
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-2 break-words text-xs text-zinc-500">
             Укажите ссылку на англоязычную статью
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
           {ACTIONS.map((action) => (
             <button
               key={action.id}
@@ -246,19 +246,19 @@ export default function ArticleAnalyzer() {
               title={action.title}
               onClick={() => handleAction(action.id)}
               disabled={loading}
-              className="rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {action.label}
             </button>
           ))}
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex sm:justify-end">
           <button
             type="button"
             onClick={handleClear}
             disabled={loading}
-            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-600 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-600 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             Очистить
           </button>
@@ -266,31 +266,33 @@ export default function ArticleAnalyzer() {
       </form>
 
       {errorMessage && (
-        <Alert variant="destructive" className="mt-4">
+        <Alert variant="destructive" className="mt-4 break-words">
           <AlertCircle className="size-4" />
           <AlertTitle>{getErrorTitle(errorCode ?? undefined)}</AlertTitle>
-          <AlertDescription>{errorMessage}</AlertDescription>
+          <AlertDescription className="break-words">
+            {errorMessage}
+          </AlertDescription>
         </Alert>
       )}
 
       {loading && statusText && (
         <div
-          className="mt-8 flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800"
+          className="mt-6 flex min-w-0 items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 sm:mt-8"
           aria-live="polite"
           aria-busy="true"
         >
           <span
-            className="size-4 shrink-0 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600"
+            className="mt-0.5 size-4 shrink-0 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600"
             aria-hidden="true"
           />
-          <span>{statusText}</span>
+          <span className="min-w-0 break-words">{statusText}</span>
         </div>
       )}
 
-      <section ref={resultSectionRef} className="mt-8 scroll-mt-6">
-        <div className="mb-2 flex items-center justify-between gap-3">
+      <section ref={resultSectionRef} className="mt-6 scroll-mt-6 sm:mt-8">
+        <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-sm font-medium text-zinc-700">Результат</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
             {activeLabel && !loading && result && (
               <span className="text-xs text-zinc-500">{activeLabel}</span>
             )}
@@ -298,7 +300,7 @@ export default function ArticleAnalyzer() {
               <button
                 type="button"
                 onClick={handleCopy}
-                className="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50"
               >
                 {copied ? (
                   <>
@@ -316,13 +318,13 @@ export default function ArticleAnalyzer() {
           </div>
         </div>
 
-        <div className="min-h-48 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-zinc-800">
+        <div className="min-h-40 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-zinc-800 sm:min-h-48">
           {result ? (
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+            <p className="break-words whitespace-pre-wrap text-sm leading-relaxed">
               {result}
             </p>
           ) : (
-            <p className="text-zinc-500">
+            <p className="break-words text-sm text-zinc-500 sm:text-base">
               Здесь появится результат после выбора действия
             </p>
           )}
