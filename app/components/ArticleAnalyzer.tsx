@@ -1,8 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { AlertCircle } from "lucide-react";
+
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+import { ERROR_MESSAGES, ErrorCode } from "@/lib/errors";
 
 type Action = "summary" | "thesis" | "telegram" | "translate";
+
+type ApiErrorPayload = {
+  error?: {
+    code?: ErrorCode;
+    message?: string;
+  };
+};
 
 const ACTIONS: { id: Action; label: string; title: string }[] = [
   {
@@ -34,29 +49,76 @@ const STATUS_TEXTS: Record<Action, string> = {
   translate: "Загружаю статью и перевожу текст…",
 };
 
+const ERROR_TITLES: Partial<Record<ErrorCode, string>> = {
+  URL_REQUIRED: "Нужен адрес статьи",
+  URL_INVALID: "Некорректная ссылка",
+  ARTICLE_LOAD_FAILED: "Статья не загрузилась",
+  ARTICLE_PARSE_FAILED: "Не удалось прочитать статью",
+  AI_UNAVAILABLE: "AI недоступен",
+  AI_AUTH_FAILED: "Проблема с доступом к AI",
+  AI_TIMEOUT: "Слишком долго",
+  AI_EMPTY_RESPONSE: "Пустой ответ",
+  UNKNOWN: "Ошибка",
+};
+
+function getErrorTitle(code?: ErrorCode): string {
+  if (code && ERROR_TITLES[code]) {
+    return ERROR_TITLES[code]!;
+  }
+
+  return ERROR_TITLES.UNKNOWN!;
+}
+
+function getFriendlyErrorMessage(data: ApiErrorPayload): string {
+  const code = data.error?.code;
+  const message = data.error?.message;
+
+  if (message) {
+    return message;
+  }
+
+  if (code && ERROR_MESSAGES[code]) {
+    return ERROR_MESSAGES[code];
+  }
+
+  return ERROR_MESSAGES.UNKNOWN;
+}
+
 export default function ArticleAnalyzer() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState("");
   const [activeAction, setActiveAction] = useState<Action | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState<ErrorCode | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  function showError(code: ErrorCode, message?: string) {
+    setErrorCode(code);
+    setErrorMessage(message ?? ERROR_MESSAGES[code]);
+    setActiveAction(null);
+  }
+
+  function clearError() {
+    setErrorCode(null);
+    setErrorMessage("");
+  }
 
   async function handleAction(action: Action) {
     const trimmedUrl = url.trim();
 
     if (!trimmedUrl) {
-      setError("Введите URL статьи");
+      showError(ErrorCode.URL_REQUIRED);
       return;
     }
 
     try {
       new URL(trimmedUrl);
     } catch {
-      setError("Укажите корректный URL (например, https://example.com/article)");
+      showError(ErrorCode.URL_INVALID);
       return;
     }
 
-    setError("");
+    clearError();
     setLoading(true);
     setActiveAction(action);
     setResult("");
@@ -68,20 +130,26 @@ export default function ArticleAnalyzer() {
         body: JSON.stringify({ url: trimmedUrl, action }),
       });
 
-      const data = await response.json();
+      const data = (await response.json()) as ApiErrorPayload & {
+        result?: string;
+      };
 
       if (!response.ok) {
-        throw new Error(data.error ?? "Не удалось выполнить запрос");
+        showError(
+          data.error?.code ?? ErrorCode.UNKNOWN,
+          getFriendlyErrorMessage(data),
+        );
+        return;
       }
 
       if (typeof data.result !== "string") {
-        throw new Error("Сервер вернул некорректный ответ");
+        showError(ErrorCode.UNKNOWN);
+        return;
       }
 
       setResult(data.result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
-      setActiveAction(null);
+    } catch {
+      showError(ErrorCode.UNKNOWN);
     } finally {
       setLoading(false);
     }
@@ -144,10 +212,12 @@ export default function ArticleAnalyzer() {
         </div>
       </form>
 
-      {error && (
-        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </p>
+      {errorMessage && (
+        <Alert variant="destructive" className="mt-4">
+          <AlertCircle className="size-4" />
+          <AlertTitle>{getErrorTitle(errorCode ?? undefined)}</AlertTitle>
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
       )}
 
       {loading && statusText && (

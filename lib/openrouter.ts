@@ -1,4 +1,5 @@
 import { prepareContentForAi } from "@/lib/prepare-content";
+import { AppError, ErrorCode } from "@/lib/errors";
 
 const DEEPSEEK_MODEL = "deepseek/deepseek-chat";
 const MAX_REQUEST_LENGTH = 30000;
@@ -22,26 +23,19 @@ type ChatCompletionResponse = {
   error?: { message?: string } | string;
 };
 
-function getOpenRouterErrorMessage(
-  data: ChatCompletionResponse,
-  status: number,
-): string {
-  if (typeof data.error === "string") {
-    return data.error;
-  }
-
-  if (data.error?.message) {
-    return data.error.message;
-  }
-
-  return `OpenRouter вернул ошибку: ${status}`;
-}
-
 function formatArticleInput(title: string | null, content: string): string {
   const preparedContent = prepareContentForAi(content);
   return [title ? `Title: ${title}` : "", preparedContent]
     .filter(Boolean)
     .join("\n\n");
+}
+
+function mapOpenRouterFailure(status: number): AppError {
+  if (status === 401 || status === 403) {
+    return new AppError(ErrorCode.AI_AUTH_FAILED);
+  }
+
+  return new AppError(ErrorCode.AI_UNAVAILABLE);
 }
 
 async function callOpenRouter(
@@ -52,71 +46,66 @@ async function callOpenRouter(
   const apiKey = process.env.OPENROUTER_API_KEY;
 
   if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY не задан в .env.local");
+    throw new AppError(ErrorCode.AI_AUTH_FAILED);
   }
 
-  const response = await fetch(getOpenRouterApiUrl(), {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://referent-sooty.vercel.app",
-      "X-Title": "Referent",
-    },
-    body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: userContent.slice(0, MAX_REQUEST_LENGTH),
-        },
-      ],
-    }),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  try {
+    const response = await fetch(getOpenRouterApiUrl(), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://referent-sooty.vercel.app",
+        "X-Title": "Referent",
+      },
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: userContent.slice(0, MAX_REQUEST_LENGTH),
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
 
-  const data = (await response.json()) as ChatCompletionResponse;
+    const data = (await response.json()) as ChatCompletionResponse;
 
-  if (!response.ok) {
-    const message = getOpenRouterErrorMessage(data, response.status);
-
-    if (response.status === 403) {
-      throw new Error(
-        `${message}. Проверьте API-ключ, баланс и настройки безопасности на openrouter.ai/settings`,
-      );
+    if (!response.ok) {
+      throw mapOpenRouterFailure(response.status);
     }
 
-    throw new Error(message);
+    const result = data.choices?.[0]?.message?.content?.trim();
+
+    if (!result) {
+      throw new AppError(ErrorCode.AI_EMPTY_RESPONSE);
+    }
+
+    return result;
+  } catch (err) {
+    if (err instanceof AppError) {
+      throw err;
+    }
+
+    if (err instanceof Error && err.name === "TimeoutError") {
+      throw new AppError(ErrorCode.AI_TIMEOUT);
+    }
+
+    throw new AppError(ErrorCode.AI_UNAVAILABLE);
   }
-
-  const result = data.choices?.[0]?.message?.content?.trim();
-
-  if (!result) {
-    throw new Error("Модель не вернула ответ");
-  }
-
-  return result;
 }
 
 export async function translateArticle(
   title: string | null,
   content: string,
 ): Promise<string> {
-  try {
-    return await callOpenRouter(
-      "You are a professional translator. Translate the following English article into Russian. Preserve meaning, tone, and paragraph structure. Return only the translation without comments.",
-      formatArticleInput(title, content),
-      TRANSLATE_TIMEOUT_MS,
-    );
-  } catch (err) {
-    if (err instanceof Error && err.name === "TimeoutError") {
-      throw new Error(
-        "Перевод занял слишком много времени. Попробуйте более короткую статью.",
-      );
-    }
-    throw err;
-  }
+  return callOpenRouter(
+    "You are a professional translator. Translate the following English article into Russian. Preserve meaning, tone, and paragraph structure. Return only the translation without comments.",
+    formatArticleInput(title, content),
+    TRANSLATE_TIMEOUT_MS,
+  );
 }
 
 export async function summarizeArticle(

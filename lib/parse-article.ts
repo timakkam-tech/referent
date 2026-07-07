@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { AppError, ErrorCode } from "@/lib/errors";
 
 export type ParsedArticle = {
   date: string | null;
@@ -121,19 +122,27 @@ export function parseArticleHtml(html: string): ParsedArticle {
 }
 
 export async function fetchAndParseArticle(url: string): Promise<ParsedArticle> {
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (compatible; ReferentBot/1.0; +https://referent.app)",
-      Accept: "text/html,application/xhtml+xml",
-    },
-    signal: AbortSignal.timeout(15000),
-  });
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (compatible; ReferentBot/1.0; +https://referent.app)",
+        Accept: "text/html,application/xhtml+xml",
+      },
+      signal: AbortSignal.timeout(15000),
+    });
 
-  if (!response.ok) {
-    throw new Error(`Не удалось загрузить страницу: ${response.status}`);
+    if (!response.ok) {
+      throw new AppError(ErrorCode.ARTICLE_LOAD_FAILED);
+    }
+
+    const html = await response.text();
+    return parseArticleHtml(html);
+  } catch (err) {
+    if (err instanceof AppError) {
+      throw err;
+    }
+
+    throw new AppError(ErrorCode.ARTICLE_LOAD_FAILED);
   }
-
-  const html = await response.text();
-  return parseArticleHtml(html);
 }

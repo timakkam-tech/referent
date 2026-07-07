@@ -5,6 +5,12 @@ import {
   summarizeArticle,
   translateArticle,
 } from "@/lib/openrouter";
+import {
+  AppError,
+  ErrorCode,
+  getHttpStatusForError,
+  toApiErrorResponse,
+} from "@/lib/errors";
 import { fetchAndParseArticle } from "@/lib/parse-article";
 
 export const maxDuration = 300;
@@ -29,41 +35,51 @@ export async function POST(request: NextRequest) {
   const action = body.action as Action;
 
   if (!url) {
-    return NextResponse.json({ error: "URL не указан" }, { status: 400 });
+    const error = new AppError(ErrorCode.URL_REQUIRED);
+    return NextResponse.json(toApiErrorResponse(error), {
+      status: getHttpStatusForError(error.code),
+    });
   }
 
   try {
     new URL(url);
   } catch {
-    return NextResponse.json({ error: "Некорректный URL" }, { status: 400 });
+    const error = new AppError(ErrorCode.URL_INVALID);
+    return NextResponse.json(toApiErrorResponse(error), {
+      status: getHttpStatusForError(error.code),
+    });
   }
 
   if (!VALID_ACTIONS.includes(action)) {
-    return NextResponse.json({ error: "Неизвестное действие" }, { status: 400 });
+    const error = new AppError(ErrorCode.ACTION_INVALID);
+    return NextResponse.json(toApiErrorResponse(error), {
+      status: getHttpStatusForError(error.code),
+    });
   }
 
   try {
     const article = await fetchAndParseArticle(url);
 
     if (!article.title && !article.content) {
-      return NextResponse.json(
-        { error: "Не удалось извлечь содержимое статьи" },
-        { status: 422 },
-      );
+      const error = new AppError(ErrorCode.ARTICLE_PARSE_FAILED);
+      return NextResponse.json(toApiErrorResponse(error), {
+        status: getHttpStatusForError(error.code),
+      });
     }
 
     if (!article.content) {
-      return NextResponse.json(
-        { error: "Не удалось извлечь текст статьи" },
-        { status: 422 },
-      );
+      const error = new AppError(ErrorCode.ARTICLE_PARSE_FAILED);
+      return NextResponse.json(toApiErrorResponse(error), {
+        status: getHttpStatusForError(error.code),
+      });
     }
 
     const result = await AI_HANDLERS[action](article.title, article.content);
     return NextResponse.json({ result });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Ошибка при обработке статьи";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const payload = toApiErrorResponse(err);
+    return NextResponse.json(payload, {
+      status: getHttpStatusForError(payload.error.code),
+    });
   }
 }
