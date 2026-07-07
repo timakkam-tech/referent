@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertCircle, Check, Copy } from "lucide-react";
 
 import {
   Alert,
@@ -85,12 +85,14 @@ function getFriendlyErrorMessage(data: ApiErrorPayload): string {
 }
 
 export default function ArticleAnalyzer() {
+  const resultSectionRef = useRef<HTMLElement>(null);
   const [url, setUrl] = useState("");
   const [result, setResult] = useState("");
   const [activeAction, setActiveAction] = useState<Action | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorCode, setErrorCode] = useState<ErrorCode | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [copied, setCopied] = useState(false);
 
   function showError(code: ErrorCode, message?: string) {
     setErrorCode(code);
@@ -102,6 +104,46 @@ export default function ArticleAnalyzer() {
     setErrorCode(null);
     setErrorMessage("");
   }
+
+  function handleClear() {
+    setUrl("");
+    setResult("");
+    setActiveAction(null);
+    setLoading(false);
+    setErrorCode(null);
+    setErrorMessage("");
+    setCopied(false);
+  }
+
+  async function handleCopy() {
+    if (!result) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(result);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!copied) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setCopied(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  useEffect(() => {
+    if (!result || loading) {
+      return;
+    }
+
+    resultSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [result, loading]);
 
   async function handleAction(action: Action) {
     const trimmedUrl = url.trim();
@@ -210,6 +252,17 @@ export default function ArticleAnalyzer() {
             </button>
           ))}
         </div>
+
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={loading}
+            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-600 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Очистить
+          </button>
+        </div>
       </form>
 
       {errorMessage && (
@@ -234,12 +287,33 @@ export default function ArticleAnalyzer() {
         </div>
       )}
 
-      <section className="mt-8">
-        <div className="mb-2 flex items-center justify-between">
+      <section ref={resultSectionRef} className="mt-8 scroll-mt-6">
+        <div className="mb-2 flex items-center justify-between gap-3">
           <h2 className="text-sm font-medium text-zinc-700">Результат</h2>
-          {activeLabel && !loading && result && (
-            <span className="text-xs text-zinc-500">{activeLabel}</span>
-          )}
+          <div className="flex items-center gap-2">
+            {activeLabel && !loading && result && (
+              <span className="text-xs text-zinc-500">{activeLabel}</span>
+            )}
+            {result && !loading && (
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50"
+              >
+                {copied ? (
+                  <>
+                    <Check className="size-3.5" aria-hidden="true" />
+                    Скопировано
+                  </>
+                ) : (
+                  <>
+                    <Copy className="size-3.5" aria-hidden="true" />
+                    Копировать
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="min-h-48 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-zinc-800">
