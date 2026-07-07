@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/alert";
 import { ERROR_MESSAGES, ErrorCode } from "@/lib/errors";
 
+import MarkdownContent from "./MarkdownContent";
+
 type Action = "summary" | "thesis" | "telegram" | "translate";
 
 type ApiErrorPayload = {
@@ -320,9 +322,7 @@ export default function ArticleAnalyzer() {
 
         <div className="min-h-40 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-zinc-800 sm:min-h-48">
           {result ? (
-            <p className="break-words whitespace-pre-wrap text-sm leading-relaxed">
-              {result}
-            </p>
+            <MarkdownContent content={result} />
           ) : (
             <p className="break-words text-sm text-zinc-500 sm:text-base">
               Здесь появится результат после выбора действия
