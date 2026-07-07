@@ -19,10 +19,23 @@ type ChatCompletionResponse = {
       content?: string;
     };
   }>;
-  error?: {
-    message?: string;
-  };
+  error?: { message?: string } | string;
 };
+
+function getOpenRouterErrorMessage(
+  data: ChatCompletionResponse,
+  status: number,
+): string {
+  if (typeof data.error === "string") {
+    return data.error;
+  }
+
+  if (data.error?.message) {
+    return data.error.message;
+  }
+
+  return `OpenRouter вернул ошибку: ${status}`;
+}
 
 function formatArticleInput(title: string | null, content: string): string {
   const preparedContent = prepareContentForAi(content);
@@ -66,9 +79,15 @@ async function callOpenRouter(
   const data = (await response.json()) as ChatCompletionResponse;
 
   if (!response.ok) {
-    throw new Error(
-      data.error?.message ?? `OpenRouter вернул ошибку: ${response.status}`,
-    );
+    const message = getOpenRouterErrorMessage(data, response.status);
+
+    if (response.status === 403) {
+      throw new Error(
+        `${message}. Проверьте API-ключ, баланс и настройки безопасности на openrouter.ai/settings`,
+      );
+    }
+
+    throw new Error(message);
   }
 
   const result = data.choices?.[0]?.message?.content?.trim();
