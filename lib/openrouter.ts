@@ -137,3 +137,21 @@ export async function generateTelegramPost(
     formatArticleInput(title, content),
   );
 }
+
+export async function generateIllustrationPrompt(
+  title: string | null,
+  content: string,
+): Promise<string> {
+  const prompt = await callOpenRouter(
+    [
+      "You create concise English prompts for text-to-image models.",
+      "Based on the article, write ONE detailed image prompt in English.",
+      "Describe a single clear scene: subject, setting, mood, lighting, and art style.",
+      "No text in the image, no logos, no watermarks, no frames.",
+      "Return only the prompt text, without quotes or explanations.",
+    ].join(" "),
+    formatArticleInput(title, content),
+  );
+
+  return prompt.replace(/^["'«»]+|["'«»]+$/g, "").trim();
+}

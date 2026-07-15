@@ -12,7 +12,7 @@ import { ERROR_MESSAGES, ErrorCode } from "@/lib/errors";
 
 import MarkdownContent from "./MarkdownContent";
 
-type Action = "summary" | "thesis" | "telegram" | "translate";
+type Action = "summary" | "thesis" | "telegram" | "translate" | "illustration";
 
 type ApiErrorPayload = {
   error?: {
@@ -42,6 +42,11 @@ const ACTIONS: { id: Action; label: string; title: string }[] = [
     label: "Перевод",
     title: "Перевод статьи на русский язык",
   },
+  {
+    id: "illustration",
+    label: "Иллюстрация",
+    title: "Изображение по содержанию статьи",
+  },
 ];
 
 const STATUS_TEXTS: Record<Action, string> = {
@@ -49,6 +54,7 @@ const STATUS_TEXTS: Record<Action, string> = {
   thesis: "Загружаю статью и формирую тезисы…",
   telegram: "Загружаю статью и готовлю пост для Telegram…",
   translate: "Загружаю статью и перевожу текст…",
+  illustration: "Готовлю промпт и генерирую иллюстрацию…",
 };
 
 const ERROR_TITLES: Partial<Record<ErrorCode, string>> = {
@@ -90,11 +96,15 @@ export default function ArticleAnalyzer() {
   const resultSectionRef = useRef<HTMLElement>(null);
   const [url, setUrl] = useState("");
   const [result, setResult] = useState("");
+  const [imageResult, setImageResult] = useState("");
+  const [imagePrompt, setImagePrompt] = useState("");
   const [activeAction, setActiveAction] = useState<Action | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorCode, setErrorCode] = useState<ErrorCode | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [copied, setCopied] = useState(false);
+
+  const hasResult = Boolean(result || imageResult);
 
   function showError(code: ErrorCode, message?: string) {
     setErrorCode(code);
@@ -110,6 +120,8 @@ export default function ArticleAnalyzer() {
   function handleClear() {
     setUrl("");
     setResult("");
+    setImageResult("");
+    setImagePrompt("");
     setActiveAction(null);
     setLoading(false);
     setErrorCode(null);
@@ -118,12 +130,14 @@ export default function ArticleAnalyzer() {
   }
 
   async function handleCopy() {
-    if (!result) {
+    const textToCopy = result || imagePrompt;
+
+    if (!textToCopy) {
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(result);
+      await navigator.clipboard.writeText(textToCopy);
       setCopied(true);
     } catch {
       setCopied(false);
@@ -140,12 +154,15 @@ export default function ArticleAnalyzer() {
   }, [copied]);
 
   useEffect(() => {
-    if (!result || loading) {
+    if (!hasResult || loading) {
       return;
     }
 
-    resultSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [result, loading]);
+    resultSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [hasResult, loading, result, imageResult]);
 
   async function handleAction(action: Action) {
     const trimmedUrl = url.trim();
@@ -166,6 +183,9 @@ export default function ArticleAnalyzer() {
     setLoading(true);
     setActiveAction(action);
     setResult("");
+    setImageResult("");
+    setImagePrompt("");
+    setCopied(false);
 
     try {
       const response = await fetch("/api/analyze", {
@@ -176,12 +196,27 @@ export default function ArticleAnalyzer() {
 
       const data = (await response.json()) as ApiErrorPayload & {
         result?: string;
+        image?: string;
+        prompt?: string;
       };
 
       if (!response.ok) {
         showError(
           data.error?.code ?? ErrorCode.UNKNOWN,
           getFriendlyErrorMessage(data),
+        );
+        return;
+      }
+
+      if (action === "illustration") {
+        if (typeof data.image !== "string" || !data.image.startsWith("data:")) {
+          showError(ErrorCode.UNKNOWN);
+          return;
+        }
+
+        setImageResult(data.image);
+        setImagePrompt(
+          typeof data.prompt === "string" ? data.prompt.trim() : "",
         );
         return;
       }
@@ -203,6 +238,7 @@ export default function ArticleAnalyzer() {
     ACTIONS.find((item) => item.id === activeAction)?.label ?? null;
 
   const statusText = activeAction ? STATUS_TEXTS[activeAction] : null;
+  const canCopy = Boolean(result || imagePrompt);
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-2xl overflow-x-hidden px-4 py-8 sm:px-6 sm:py-12 md:py-16">
@@ -240,7 +276,7 @@ export default function ArticleAnalyzer() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {ACTIONS.map((action) => (
             <button
               key={action.id}
@@ -295,10 +331,10 @@ export default function ArticleAnalyzer() {
         <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-sm font-medium text-zinc-700">Результат</h2>
           <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
-            {activeLabel && !loading && result && (
+            {activeLabel && !loading && hasResult && (
               <span className="text-xs text-zinc-500">{activeLabel}</span>
             )}
-            {result && !loading && (
+            {canCopy && !loading && (
               <button
                 type="button"
                 onClick={handleCopy}
@@ -312,7 +348,7 @@ export default function ArticleAnalyzer() {
                 ) : (
                   <>
                     <Copy className="size-3.5" aria-hidden="true" />
-                    Копировать
+                    {imageResult ? "Копировать промпт" : "Копировать"}
                   </>
                 )}
               </button>
@@ -321,7 +357,20 @@ export default function ArticleAnalyzer() {
         </div>
 
         <div className="min-h-40 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-zinc-800 sm:min-h-48">
-          {result ? (
+          {imageResult ? (
+            <div className="space-y-3">
+              <img
+                src={imageResult}
+                alt="Иллюстрация к статье"
+                className="mx-auto max-h-[32rem] w-full rounded-md object-contain"
+              />
+              {imagePrompt && (
+                <p className="break-words text-xs leading-relaxed text-zinc-500">
+                  Промпт: {imagePrompt}
+                </p>
+              )}
+            </div>
+          ) : result ? (
             <MarkdownContent content={result} />
           ) : (
             <p className="break-words text-sm text-zinc-500 sm:text-base">

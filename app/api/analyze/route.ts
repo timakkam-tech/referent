@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   extractTheses,
+  generateIllustrationPrompt,
   generateTelegramPost,
   summarizeArticle,
   translateArticle,
 } from "@/lib/openrouter";
+import { generateImageFromPrompt } from "@/lib/huggingface";
 import {
   AppError,
   ErrorCode,
@@ -15,12 +17,19 @@ import { fetchAndParseArticle } from "@/lib/parse-article";
 
 export const maxDuration = 300;
 
-type Action = "summary" | "thesis" | "telegram" | "translate";
+type Action = "summary" | "thesis" | "telegram" | "translate" | "illustration";
 
-const VALID_ACTIONS: Action[] = ["summary", "thesis", "telegram", "translate"];
+const TEXT_ACTIONS: Array<Exclude<Action, "illustration">> = [
+  "summary",
+  "thesis",
+  "telegram",
+  "translate",
+];
+
+const VALID_ACTIONS: Action[] = [...TEXT_ACTIONS, "illustration"];
 
 const AI_HANDLERS: Record<
-  Action,
+  Exclude<Action, "illustration">,
   (title: string | null, content: string) => Promise<string>
 > = {
   summary: summarizeArticle,
@@ -72,6 +81,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(toApiErrorResponse(error), {
         status: getHttpStatusForError(error.code),
       });
+    }
+
+    if (action === "illustration") {
+      const prompt = await generateIllustrationPrompt(
+        article.title,
+        article.content,
+      );
+      const image = await generateImageFromPrompt(prompt);
+
+      return NextResponse.json({ image, prompt });
     }
 
     const result = await AI_HANDLERS[action](article.title, article.content);
